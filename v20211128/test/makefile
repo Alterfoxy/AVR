@@ -4,3 +4,4 @@ all:
 	avr-objcopy -j .text -j .data -O binary main.elf main.bin
 	php ../export.php test/main.bin tb.hex
 	rm main.o main.elf
+	../avsim/avrsim.exe main.bin

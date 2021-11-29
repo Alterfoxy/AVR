@@ -17,10 +17,10 @@ void display()  {
         
     } else {       
         
-        // 20 x 1000 IPS
-        for (int i = 0; i < 1000; i++) {            
+        // 20 x N IPS
+        for (int i = 0; i < 5000; i++) {            
             step();
-            if (cpu_halt) break;
+            if (cpu_halt) { pc--; break; }
         }
     }
     

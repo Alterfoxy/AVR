@@ -27,9 +27,9 @@ enum AVROpcodes {
     MUL,    MULS,   MULSU
 };
 
-unsigned short      opcode, pc, command, cpu_halt;
+unsigned short opcode, pc, command, cpu_halt;
 struct  CPUFlags    flag;
-int     last_timer, timer;
+int     last_timer, timer, fcounter, flash;
 int     instr_counter, cycles;
 
 // Объявление процедур

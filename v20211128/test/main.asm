@@ -6,9 +6,9 @@
         eor         r30, r30
         ldi         r31, 0x5b
 L0:     st          -Z, r16
+        inc         r16
         cpi         r31, 0x3f
         brne        L0
-        sleep
         break
 ; -----------------------------------
 L1:     ldi         r16, 0xff

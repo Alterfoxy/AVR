@@ -218,9 +218,11 @@ void displayout() {
         int attr = sram[0x5800 + (x>>3) + (y>>3)*32];
         
         int cl = data & (1 << ((7 - x) & 7)) ? 1 : 0;                
-        cl = cl ? attr & 7 : (attr & 0x38)>>3;
+        cl = cl ^ ((attr & 0x80) && flash ? 1 : 0) ? attr & 7 : (attr & 0x38)>>3;
         cl = attr & 0x40 ? cl : (8 + cl);
 
         pset(900-4-256+x,4+y, dac(colortable[cl]));
     }
+    
+    fcounter++; if (fcounter > 12) { fcounter = 0; flash = !flash; }
 }
