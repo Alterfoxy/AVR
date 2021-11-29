@@ -5,13 +5,8 @@
 // Прочесть следующий опкод
 int ds_fetch(long& addr) {
 
-    int L = program[addr];
-    addr = (addr + 1) & (128*1024 - 1);
-
-    int H = program[addr];
-    addr = (addr + 1) & (128*1024 - 1);
-
-    return H*256 + L;
+    addr++;
+    return program[addr-1];
 }
 
 // Дизассемблировать адрес
@@ -40,8 +35,8 @@ int ds_info(long addr) {
     int Qi = (opcode & 0x007) | ((opcode & 0xC00)>>7) | ((opcode & 0x2000) >> 8);
 
     // Относительный переход
-    int Rjmp = addr + 2*((opcode & 0x800) > 0 ? (opcode & 0x7FF) - 0x800 : (opcode & 0x7FF));
-    int Bjmp = addr + 2*((opcode & 0x200) > 0 ? ((opcode & 0x1F8)>>3) - 0x40 : ((opcode & 0x1F8)>>3) );
+    int Rjmp = addr + ((opcode & 0x800) > 0 ? (opcode & 0x7FF) - 0x800 : (opcode & 0x7FF));
+    int Bjmp = addr + ((opcode & 0x200) > 0 ? ((opcode & 0x1F8)>>3) - 0x40 : ((opcode & 0x1F8)>>3) );
     int Bit7 = opcode & 7;
     int bit7s = (opcode & 0x70) >> 4;
     int jmpfar = (((opcode & 0x1F0) >> 3) | (opcode & 1)) << 16;
@@ -151,8 +146,8 @@ int ds_info(long addr) {
     // jmp/call 24 bit
     switch (opcode & 0xFE0E) {
 
-        case 0x940C: strcpy(mnem, "jmp");  append = ds_fetch(addr); sprintf(op1, "%05X", 2*(jmpfar + append)); break; // k2
-        case 0x940E: strcpy(mnem, "call"); append = ds_fetch(addr); sprintf(op1, "%05X", 2*(jmpfar + append)); break; // k2
+        case 0x940C: strcpy(mnem, "jmp");  append = ds_fetch(addr); sprintf(op1, "%05X", (jmpfar + append)); break; // k2
+        case 0x940E: strcpy(mnem, "call"); append = ds_fetch(addr); sprintf(op1, "%05X", (jmpfar + append)); break; // k2
     }
 
     // ST/LD
@@ -264,4 +259,58 @@ int ds_info(long addr) {
     }
 
     return addr - pvaddr;
+}
+
+// Вывести на экран код дизассемблинга
+void disassembly() {
+    
+    cls(0);
+    
+    // Откуда начинается старт
+    int  address = 0; 
+    char cline[16];
+   
+    // Дизассемблер строчный
+    for (int i = 0; i < 25; i++) {
+        
+        int size = ds_info(address);
+        
+        // Текущая строка
+        if (pc == address) block(0, 16*i, 400, 16, dac(2));
+        
+        // Указатель на текущий выполняемый PC
+        if (pc == address) print(4, i, "\x10", dac(15));
+        
+        // Адрес и инструкция
+        // -----------------------------------
+        sprintf(cline, "%04X", address);
+        print(0,  i, cline, dac(14));
+        
+        if (size == 1)
+             sprintf(cline, "%04X", program[address]);
+        else sprintf(cline, "%04X %04X", program[address], program[address+1]);
+        
+        print(5,  i, cline, dac(11));
+        print(15, i, ds_line, dac(15));
+        // -----------------------------------
+        
+        address += size;
+    }
+    
+    // Состояние регистров
+    for (int j = 0; j < 2; j++)
+    for (int i = 0; i < 16; i++) {
+        
+        sprintf(cline, "r%d", i + 16*j);
+        print(51 + 9*j, i, cline, dac(7));
+        
+        sprintf(cline, "%02X", sram[i + 16*j]);
+        print(55 + 9*j, i, cline, dac(15));    
+    }
+    
+    sprintf(cline, "PC=%04X", pc);      print(70, 0, cline, dac(15));
+    sprintf(cline, "SP=%04X", get_S()); print(70, 1, cline, dac(15));
+    sprintf(cline, " X=%04X", get_X()); print(70, 2, cline, dac(15));
+    sprintf(cline, " Y=%04X", get_Y()); print(70, 3, cline, dac(15));
+    sprintf(cline, " Z=%04X", get_Z()); print(70, 4, cline, dac(15));    
 }

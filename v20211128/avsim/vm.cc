@@ -1,5 +1,44 @@
+// Загрузка файла в память
+void loadfile(const char* fn, int address) {
+    
+    FILE* fp = fopen(fn, "rb");
+    unsigned char* pmap = (unsigned char*) calloc(128*1024, 1);
+    
+    if (fp) {
+
+        fseek(fp, 0, SEEK_END);
+        int size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        fread(pmap, 1, size, fp);
+        fclose(fp);       
+        
+        // Скопировать в память
+        for (int i = 0; i < size; i += 2) {
+            program[address + (i>>1)] = pmap[i] + 256*pmap[i+1];
+        }
+        
+        free(pmap);
+
+    } else {
+
+        free(pmap);
+        printf("Указанный файл не был найден\n");
+        exit(1);
+    }
+}
+
+void parsearg(int argc, char* argv[]) {
+    
+    for (int i = 1; i < argc; i++) {
+        
+        // Пока что просто грузит файл
+        loadfile(argv[i], 0);
+    }    
+
+}
+
 // Запись в память
-void put(int A, unsigned char D) {  
+void put(int A, unsigned char D) {
 
     A &= 0xFFFF;
     sram[A] = D;
@@ -7,66 +46,66 @@ void put(int A, unsigned char D) {
 
 // Чтение из памяти
 unsigned char get(int A) {
-    
+
     A &= 0xFFFF;
     return sram[A];
 }
 
 // Сохранить 16 бит
-void put16(int a, unsigned short v) { 
-    put(a, v); 
-    put(a+1, v>>8); 
+void put16(int a, unsigned short v) {
+    put(a, v);
+    put(a+1, v>>8);
 }
 
 // Извлечь 16 бит из памяти
-unsigned short get16(int a) { 
-    return sram[a] + 256*sram[a+1]; 
+unsigned short get16(int a) {
+    return sram[a] + 256*sram[a+1];
 }
 
 // Извлечь из стека 8 бит
-void push8(unsigned char v8) { 
-    unsigned short sp = get_S(); 
-    put(sp, v8); 
-    put_S((sp - 1) & 0xffff); 
+void push8(unsigned char v8) {
+    unsigned short sp = get_S();
+    put(sp, v8);
+    put_S((sp - 1) & 0xffff);
 }
 
 // Извлечь из стека 8 бит
-unsigned char pop8() { 
+unsigned char pop8() {
 
-    unsigned short sp = (get_S() + 1) & 0xffff; 
-    put_S(sp); 
-    return get(sp); 
+    unsigned short sp = (get_S() + 1) & 0xffff;
+    put_S(sp);
+    return get(sp);
 }
 
 // Сохранить в стек 16 бит
-void push16(unsigned short v16) { 
-    push8(v16 & 0xff); 
-    push8(v16 >> 8); 
+void push16(unsigned short v16) {
+    push8(v16 & 0xff);
+    push8(v16 >> 8);
 }
 
-unsigned short pop16() { 
+unsigned short pop16() {
 
-    int h = pop8(); 
-    int l = pop8(); 
-    return h*256 + l; 
+    int h = pop8();
+    int l = pop8();
+    return h*256 + l;
 }
 
 // Вычислить RJMP
 int get_rjmp() {
-    return (pc + ((opcode & 0x800) > 0 ? ((opcode & 0x7FF) - 0x800) : (opcode & 0x7FF))) & 0x1FFFF; 
+    return (pc + ((opcode & 0x800) > 0 ? ((opcode & 0x7FF) - 0x800) : (opcode & 0x7FF))) & 0x1FFFF;
 }
 
 // Вычислить Branch
-int get_branch() { 
-    return (pc + ((opcode & 0x200) > 0 ? ((opcode & 0x1F8)>>3) - 0x40 : ((opcode & 0x1F8)>>3) )) & 0x1FFFF; 
+int get_branch() {
+    return (pc + ((opcode & 0x200) > 0 ? ((opcode & 0x1F8)>>3) - 0x40 : ((opcode & 0x1F8)>>3) )) & 0x1FFFF;
 }
 
 // Прочесть следующий опкод из памяти
-int fetch() { 
+int fetch() {
 
-    int data = program[pc]; 
-    pc = (pc + 1) & 0xffff; 
-    return data; 
+    int data = program[pc];
+    pc = (pc + 1) & 0xffff;
+    return data;
 }
 
 // ---------------------------------------------------------------------
@@ -106,8 +145,8 @@ void assign() {
     for (i = 0; i < 65536; i++) { sram[i] = i < 32 ? 0xFF : 0; program[i] = 0; }
     for (i = 0; i < 65536; i++) { map[i] = UNDEFINED; }
 
-    sram[0x5D] = 0xFF;
-    sram[0x5E] = 0xEF;
+    sram[0x5D] = 0xFF; // SPL
+    sram[0x5E] = 0xFF; // SPH
     sram[0x5F] = 0x00; // SREG
 
     // Для отладчика
@@ -118,108 +157,110 @@ void assign() {
     flag.z = 0; flag.h = 0;
     flag.n = 0; flag.t = 0;
     flag.v = 0; flag.i = 0;
+    
+    cpu_halt = 1;
 
     // Арифметические на 2 регистра
-    assign_mask("000001rdddddrrrr", CPC);   // +
-    assign_mask("000010rdddddrrrr", SBC);   // +
-    assign_mask("000011rdddddrrrr", ADD);   // +
-    assign_mask("000101rdddddrrrr", CP);    // +
-    assign_mask("000110rdddddrrrr", SUB);   // +
-    assign_mask("000111rdddddrrrr", ADC);   // +
-    assign_mask("001000rdddddrrrr", AND);   // +
-    assign_mask("001001rdddddrrrr", EOR);   // +
-    assign_mask("001010rdddddrrrr", OR);    // +
+    assign_mask("000001rdddddrrrr", CPC);
+    assign_mask("000010rdddddrrrr", SBC);
+    assign_mask("000011rdddddrrrr", ADD);
+    assign_mask("000101rdddddrrrr", CP);
+    assign_mask("000110rdddddrrrr", SUB);
+    assign_mask("000111rdddddrrrr", ADC);
+    assign_mask("001000rdddddrrrr", AND);
+    assign_mask("001001rdddddrrrr", EOR);
+    assign_mask("001010rdddddrrrr", OR);
 
     // Арифметика регистр + операнд K
-    assign_mask("0011KKKKddddKKKK", CPI);   // +
-    assign_mask("0100KKKKddddKKKK", SBCI);  // +
-    assign_mask("0101KKKKddddKKKK", SUBI);  // +
-    assign_mask("0110KKKKddddKKKK", ORI);   // +
-    assign_mask("0111KKKKddddKKKK", ANDI);  // +
-    assign_mask("10010110KKddKKKK", ADIW);  // +
-    assign_mask("10010111KKddKKKK", SBIW);  // +
+    assign_mask("0011KKKKddddKKKK", CPI);
+    assign_mask("0100KKKKddddKKKK", SBCI);
+    assign_mask("0101KKKKddddKKKK", SUBI);
+    assign_mask("0110KKKKddddKKKK", ORI);
+    assign_mask("0111KKKKddddKKKK", ANDI);
+    assign_mask("10010110KKddKKKK", ADIW);
+    assign_mask("10010111KKddKKKK", SBIW);
 
     // Условные и безусловные переходы
-    assign_mask("1100kkkkkkkkkkkk", RJMP);  // +
-    assign_mask("1101kkkkkkkkkkkk", RCALL); // +
-    assign_mask("1001010100001000", RET);   // +
-    assign_mask("1001010100011000", RETI);  // +
-    assign_mask("111100kkkkkkksss", BRBS);  // +
-    assign_mask("111101kkkkkkksss", BRBC);  // +
-    assign_mask("1111110ddddd0bbb", SBRC);  // +
-    assign_mask("1111111ddddd0bbb", SBRS);  // +
-    assign_mask("10011001AAAAAbbb", SBIC);  // +
-    assign_mask("10011011AAAAAbbb", SBIS);  // +
-    assign_mask("000100rdddddrrrr", CPSE);  // +
+    assign_mask("1100kkkkkkkkkkkk", RJMP);
+    assign_mask("1101kkkkkkkkkkkk", RCALL);
+    assign_mask("1001010100001000", RET);
+    assign_mask("1001010100011000", RETI);
+    assign_mask("111100kkkkkkksss", BRBS);
+    assign_mask("111101kkkkkkksss", BRBC);
+    assign_mask("1111110ddddd0bbb", SBRC);
+    assign_mask("1111111ddddd0bbb", SBRS);
+    assign_mask("10011001AAAAAbbb", SBIC);
+    assign_mask("10011011AAAAAbbb", SBIS);
+    assign_mask("000100rdddddrrrr", CPSE);
 
     // Непрямые и длинные переходы
-    assign_mask("1001010100001001", ICALL); // +
+    assign_mask("1001010100001001", ICALL);
     assign_mask("1001010100011001", EICALL);
-    assign_mask("1001010000001001", IJMP);  // +
-    assign_mask("1001010000011001", EIJMP); // +
-    assign_mask("1001010kkkkk111k", CALL);  // +
-    assign_mask("1001010kkkkk110k", JMP);   // +
+    assign_mask("1001010000001001", IJMP);
+    assign_mask("1001010000011001", EIJMP);
+    assign_mask("1001010kkkkk111k", CALL);
+    assign_mask("1001010kkkkk110k", JMP);
 
     // Перемещения
-    assign_mask("1110KKKKddddKKKK", LDI);   // +
-    assign_mask("001011rdddddrrrr", MOV);   // +
-    assign_mask("1001000ddddd0000", LDS);   // +
-    assign_mask("1001001ddddd0000", STS);   // +
-    assign_mask("00000001ddddrrrr", MOVW);  // +
-    assign_mask("1111100ddddd0bbb", BLD);   // +
-    assign_mask("1111101ddddd0bbb", BST);   // +
-    assign_mask("1001001ddddd0100", XCH);   // +
+    assign_mask("1110KKKKddddKKKK", LDI);
+    assign_mask("001011rdddddrrrr", MOV);
+    assign_mask("1001000ddddd0000", LDS);
+    assign_mask("1001001ddddd0000", STS);
+    assign_mask("00000001ddddrrrr", MOVW);
+    assign_mask("1111100ddddd0bbb", BLD);
+    assign_mask("1111101ddddd0bbb", BST);
+    assign_mask("1001001ddddd0100", XCH);
 
     // Однооперандные
-    assign_mask("1001010ddddd0011", INC);   // +
-    assign_mask("1001010ddddd1010", DEC);   // +
-    assign_mask("1001010ddddd0110", LSR);   // +
-    assign_mask("1001010ddddd0101", ASR);   // +
-    assign_mask("1001010ddddd0111", ROR);   // +
-    assign_mask("1001010ddddd0001", NEG);   // +
-    assign_mask("1001010ddddd0000", COM);   // +
-    assign_mask("1001010ddddd0010", SWAP);  // +
-    assign_mask("1001001ddddd0110", LAC);   // +
-    assign_mask("1001001ddddd0101", LAS);   // +
-    assign_mask("1001001ddddd0111", LAT);   // +
-    assign_mask("100101001sss1000", BCLR);  // +
-    assign_mask("100101000sss1000", BSET);  // +
-    assign_mask("10011000AAAAAbbb", CBI);   // +
-    assign_mask("10011010AAAAAbbb", SBI);   // +
+    assign_mask("1001010ddddd0011", INC);
+    assign_mask("1001010ddddd1010", DEC);
+    assign_mask("1001010ddddd0110", LSR);
+    assign_mask("1001010ddddd0101", ASR);
+    assign_mask("1001010ddddd0111", ROR);
+    assign_mask("1001010ddddd0001", NEG);
+    assign_mask("1001010ddddd0000", COM);
+    assign_mask("1001010ddddd0010", SWAP);
+    assign_mask("1001001ddddd0110", LAC);
+    assign_mask("1001001ddddd0101", LAS);
+    assign_mask("1001001ddddd0111", LAT);
+    assign_mask("100101001sss1000", BCLR);
+    assign_mask("100101000sss1000", BSET);
+    assign_mask("10011000AAAAAbbb", CBI);
+    assign_mask("10011010AAAAAbbb", SBI);
 
     // Косвенная загрузка из памяти
-    assign_mask("1001000ddddd1100", LDX);   // +
-    assign_mask("1001000ddddd1101", LDX_);  // +
-    assign_mask("1001000ddddd1110", LD_X);  // +
-    assign_mask("1001000ddddd1001", LDY_);  // +
-    assign_mask("1001000ddddd1010", LD_Y);  // +
-    assign_mask("10q0qq0ddddd1qqq", LDYQ);  // +
-    assign_mask("1001000ddddd0001", LDZ_);  // +
-    assign_mask("1001000ddddd0010", LD_Z);  // +
-    assign_mask("10q0qq0ddddd0qqq", LDZQ);  // +
+    assign_mask("1001000ddddd1100", LDX);
+    assign_mask("1001000ddddd1101", LDX_);
+    assign_mask("1001000ddddd1110", LD_X);
+    assign_mask("1001000ddddd1001", LDY_);
+    assign_mask("1001000ddddd1010", LD_Y);
+    assign_mask("10q0qq0ddddd1qqq", LDYQ);
+    assign_mask("1001000ddddd0001", LDZ_);
+    assign_mask("1001000ddddd0010", LD_Z);
+    assign_mask("10q0qq0ddddd0qqq", LDZQ);
 
     // Косвенное сохранение
-    assign_mask("1001001ddddd1100", STX);   // +
-    assign_mask("1001001ddddd1101", STX_);  // +
-    assign_mask("1001001ddddd1110", ST_X);  // +
-    assign_mask("1001001ddddd1001", STY_);  // +
-    assign_mask("1001001ddddd1010", ST_Y);  // +
-    assign_mask("10q0qq1ddddd1qqq", STYQ);  // +
-    assign_mask("1001001ddddd0001", STZ_);  // +
-    assign_mask("1001001ddddd0010", ST_Z);  // +
-    assign_mask("10q0qq1ddddd0qqq", STZQ);  // +
+    assign_mask("1001001ddddd1100", STX);
+    assign_mask("1001001ddddd1101", STX_);
+    assign_mask("1001001ddddd1110", ST_X);
+    assign_mask("1001001ddddd1001", STY_);
+    assign_mask("1001001ddddd1010", ST_Y);
+    assign_mask("10q0qq1ddddd1qqq", STYQ);
+    assign_mask("1001001ddddd0001", STZ_);
+    assign_mask("1001001ddddd0010", ST_Z);
+    assign_mask("10q0qq1ddddd0qqq", STZQ);
 
     // Загрузка из запись в память программ
-    assign_mask("1001010111001000", LPM0Z);  // +
-    assign_mask("1001000ddddd0100", LPMRZ);  // +
-    assign_mask("1001000ddddd0101", LPMRZ_); // +
+    assign_mask("1001010111001000", LPM0Z);
+    assign_mask("1001000ddddd0100", LPMRZ);
+    assign_mask("1001000ddddd0101", LPMRZ_);
     assign_mask("1001010111101000", SPM);
     assign_mask("1001010111111000", SPM2);
 
     // Особые инструкции расширенной загрузки из памяти
-    assign_mask("1001010111011000", ELPM0Z); 
-    assign_mask("1001000ddddd0110", ELPMRZ); 
-    assign_mask("1001000ddddd0111", ELPMRZ_); 
+    assign_mask("1001010111011000", ELPM0Z);
+    assign_mask("1001000ddddd0110", ELPMRZ);
+    assign_mask("1001000ddddd0111", ELPMRZ_);
 
     // Специальные
     assign_mask("1001010110001000", SLEEP);
@@ -400,7 +441,7 @@ int step() {
         case NOP: break;
 
         // Остановка выполнения кода
-        case SLEEP: /* pc = pc - 2; break; */
+        case SLEEP: pc--; break;
         case BREAK: cpu_halt = 1; break;
 
         // Управляющие
@@ -654,7 +695,7 @@ int step() {
         // =============================================================
         // Перемещения
         // =============================================================
-        
+
         case LDI: put_rdi(get_imm8()); break;
 
         // Загрузка из памяти в регистры

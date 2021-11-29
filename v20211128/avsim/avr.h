@@ -1,7 +1,7 @@
 // Исполнение программы
 // -----------------------------------------------------------------------------
 
-unsigned int    program[65536];
+unsigned short  program[65536];
 unsigned char   sram   [65536];
 int             map[65536];
 
@@ -116,3 +116,6 @@ int     ds_brk[128];            // Брейкпоинты
 int     ds_brk_cnt;
 int     ds_dump_cursor;
 int     ds_dump_start;
+
+void    ds_keydown_spec(int key, int x, int y);
+void    ds_keydown(unsigned char key, int x, int y);
