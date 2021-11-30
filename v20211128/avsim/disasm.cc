@@ -267,7 +267,8 @@ void disassembly() {
     cls(0);
     
     // Откуда начинается старт
-    int  address = 0; 
+    int  address = ds_start; 
+    int  touch   = 0;
     char cline[16];
    
     // Дизассемблер строчный
@@ -276,7 +277,7 @@ void disassembly() {
         int size = ds_info(address);
         
         // Текущая строка
-        if (pc == address) block(0, 16*i, 400, 16, dac(2));
+        if (ds_cursor == address) { touch = 1; block(0, 16*i, 400, 16, dac(2)); }
         
         // Указатель на текущий выполняемый PC
         if (pc == address) print(4, i, "\x10", dac(15));
@@ -296,6 +297,9 @@ void disassembly() {
         
         address += size;
     }
+    
+    // Если вышел за пределы курсор
+    if (touch == 0) ds_start = pc;
     
     // Состояние регистров
     for (int j = 0; j < 2; j++)

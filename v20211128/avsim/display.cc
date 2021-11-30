@@ -2,6 +2,26 @@
 // Процедуры для работы с выводом текста
 // ---------------------------------------------------------------------
 
+// Обработчик окна при вызове таймера
+void display()  {
+    
+    if (cpu_halt) {
+    
+        disassembly();   
+        
+    } else {       
+        
+        // 20 x N IPS
+        for (int i = 0; i < 5000; i++) {            
+            step();
+            if (cpu_halt) { pc--; ds_cursor = pc; break; }
+        }
+    }
+    
+    displayout();
+    update();
+}
+
 // Запустить экран
 int screen() {
 
@@ -45,12 +65,14 @@ void ds_keydown_spec(int key, int x, int y) {
         case GLUT_KEY_F7: 
         
             step();
+            ds_cursor = pc;
             break;     
 
         // Запуск
         case GLUT_KEY_F9:
         
             cpu_halt = !cpu_halt;
+            ds_cursor = pc;
             
             // Притушить отладчик
             if (cpu_halt == 0) {
@@ -219,7 +241,7 @@ void displayout() {
         
         int cl = data & (1 << ((7 - x) & 7)) ? 1 : 0;                
         cl = cl ^ ((attr & 0x80) && flash ? 1 : 0) ? attr & 7 : (attr & 0x38)>>3;
-        cl = attr & 0x40 ? cl : (8 + cl);
+        cl = attr & 0x40 ? (8 + cl) : cl;
 
         pset(900-4-256+x,4+y, dac(colortable[cl]));
     }

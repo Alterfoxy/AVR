@@ -158,7 +158,10 @@ void assign() {
     flag.n = 0; flag.t = 0;
     flag.v = 0; flag.i = 0;
     
-    cpu_halt = 1;
+    cpu_halt    = 1;
+    ds_start    = 0;
+    ds_cursor   = 0;
+    ds_current  = 0;
 
     // Арифметические на 2 регистра
     assign_mask("000001rdddddrrrr", CPC);

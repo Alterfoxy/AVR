@@ -2,12 +2,13 @@
         .org        0
         
         eor         r0, r0
-        ldi         r16, 0x02
         eor         r30, r30
-        ldi         r31, 0x5b
+        ldi         r31, 0x5b           ; Z=5B00h
+        ldi         r16, 0x4F
 L0:     st          -Z, r16
         inc         r16
-        cpi         r31, 0x3f
+        cpi         r31, 0x58
+        cpc         r30, r0
         brne        L0
         break
 ; -----------------------------------

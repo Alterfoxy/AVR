@@ -35,6 +35,8 @@ int     instr_counter, cycles;
 // Объявление процедур
 void assign();
 void config();
+void displayout();
+void disassembly();
 void assign_mask(const char* mask, int opcode);
 void interruptcall();
 
